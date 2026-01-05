@@ -1,0 +1,27 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "olx-car-finder",
+    "main": "src/index.ts",
+    "compatibility_date": "2024-12-01",
+    "compatibility_flags": [
+        "nodejs_compat"
+    ],
+    // D1 Database binding
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "olx-car-finder-db",
+            "database_id": "069d50ac-8485-468d-8428-cce0d128c966"
+        }
+    ],
+    // Scheduled triggers for periodic monitoring
+    "triggers": {
+        "crons": [
+            "*/30 * * * *"
+        ]
+    },
+    // Environment variables
+    "vars": {
+        "API_TOKEN": "change-me-in-prod-please"
+    }
+}
