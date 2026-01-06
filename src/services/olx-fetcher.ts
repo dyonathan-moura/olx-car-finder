@@ -152,41 +152,61 @@ export async function fetchPage(dataUrl: string): Promise<{ ads: OlxAd[], status
     }
 }
 
-/**
- * Parse OLX ad to our Listing format
- */
 export function parseAd(ad: OlxAd, searchId: string): Listing {
-    // Try to extract model from properties
-    let model: string | null = null;
-    if (ad.properties) {
-        const modelProp = ad.properties.find(p =>
-            p.label.toLowerCase().includes('modelo') ||
-            p.label.toLowerCase().includes('model')
-        );
-        if (modelProp) {
-            model = modelProp.value;
-        }
-    }
+    // Helper to find property by name (preferred) or label fallback
+    const findProp = (names: string[], labels: string[]): string | null => {
+        if (!ad.properties) return null;
 
-    // Fallback: extract model from subject (first word after brand)
-    if (!model && ad.subject) {
+        // First try by name (more reliable)
+        for (const name of names) {
+            const prop = ad.properties.find(p => p.name === name);
+            if (prop) return prop.value;
+        }
+
+        // Fallback to label
+        for (const label of labels) {
+            const prop = ad.properties.find(p =>
+                p.label.toLowerCase().includes(label.toLowerCase())
+            );
+            if (prop) return prop.value;
+        }
+
+        return null;
+    };
+
+    // Extract brand using structured property
+    let brand = findProp(['vehicle_brand'], ['marca']);
+
+    // Extract model using structured property
+    let model = findProp(['vehicle_model'], ['modelo', 'model']);
+
+    // If model includes brand, create a clean "Brand Model" format
+    if (brand && model) {
+        // Clean redundant brand from model if present
+        if (model.toLowerCase().startsWith(brand.toLowerCase())) {
+            model = model.substring(brand.length).trim();
+        }
+        // Create combined "Brand Model" for grouping
+        model = `${brand} ${model}`.trim();
+    } else if (!model && ad.subject) {
+        // Fallback: extract from subject
         model = extractModelFromSubject(ad.subject);
-    }
-
-    // Extract mileage
-    let mileage: number | null = null;
-    if (ad.properties) {
-        const mileageProp = ad.properties.find(p =>
-            p.label.toLowerCase().includes('quilômet') ||
-            p.label.toLowerCase().includes('mileage') ||
-            p.label.toLowerCase().includes('km')
-        );
-        if (mileageProp) {
-            // Remove non-digits and parse
-            const clean = mileageProp.value.replace(/\D/g, '');
-            mileage = parseInt(clean, 10) || null;
+        // Try to extract brand from first word of subject
+        if (!brand && ad.subject) {
+            brand = ad.subject.split(/\s+/)[0] || null;
         }
     }
+
+    // Extract mileage using structured property
+    let mileage: number | null = null;
+    const mileageStr = findProp(['mileage'], ['quilômet', 'km']);
+    if (mileageStr) {
+        const clean = mileageStr.replace(/\D/g, '');
+        mileage = parseInt(clean, 10) || null;
+    }
+
+    // Extract year using structured property (for future use)
+    const year = findProp(['regdate'], ['ano']);
 
     return {
         list_id: String(ad.listId),
@@ -196,9 +216,10 @@ export function parseAd(ad: OlxAd, searchId: string): Listing {
         municipality: ad.location?.municipality || null,
         neighbourhood: ad.location?.neighbourhood || null,
         ad_url: ad.url.startsWith('http') ? ad.url : `${OLX_BASE_URL}${ad.url}`,
+        brand: brand,
         model: model,
         date_ts: ad.date || null,
-        thumbnail_url: ad.thumbnail || null,
+        thumbnail_url: ad.images?.[0]?.original || ad.thumbnail || null,
         mileage: mileage,
         collected_at: new Date().toISOString(),
     };

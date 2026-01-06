@@ -256,6 +256,18 @@ body {
     color: var(--text-secondary);
 }
 
+.filter-toggle.highlight {
+    background: rgba(124, 58, 237, 0.15);
+    padding: 6px 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--accent-primary);
+}
+
+.filter-toggle.highlight label {
+    color: var(--accent-secondary);
+    font-weight: 500;
+}
+
 /* Ranking Panels */
 .ranking-panels {
     display: grid;
@@ -736,3 +748,151 @@ body {
         width: 100%;
     }
 }
+/* Model Cards Layout (E-commerce style) */
+.model-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.model-card-item {
+    display: flex;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.model-card-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+    transform: translateY(-1px);
+}
+
+.model-thumb-container {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+    margin-right: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.model-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.model-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--text-secondary);
+}
+
+.model-info-content {
+    flex: 1;
+    min-width: 0; /* Enable truncation */
+}
+
+.model-card-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.model-card-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.model-stat-pill {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.model-card-actions {
+    margin-left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Override panel padding for this tab */
+#models-tab {
+    padding: 0 4px;
+}
+
+
+/* Listings Feed Thumbnails */
+.listing-card {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.listing-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+    transform: translateY(-1px);
+}
+
+.listing-thumb-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.listing-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.listing-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--text-secondary);
+}
+
+.listing-info {
+    flex: 1;
+    min-width: 0;
+}
+

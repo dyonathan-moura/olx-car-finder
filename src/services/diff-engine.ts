@@ -105,8 +105,8 @@ export async function createAlerts(
     const now = new Date().toISOString();
 
     const insertStmt = env.DB.prepare(`
-    INSERT INTO alerts (search_id, list_id, subject, price, municipality, neighbourhood, ad_url, model, thumbnail_url, mileage, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)
+    INSERT INTO alerts (search_id, list_id, subject, price, municipality, neighbourhood, ad_url, brand, model, thumbnail_url, mileage, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)
   `);
 
     const batch = newListings.map(listing => {
@@ -135,6 +135,7 @@ export async function createAlerts(
             listing.municipality,
             listing.neighbourhood,
             listing.ad_url,
+            listing.brand,
             listing.model,
             listing.thumbnail_url,
             listing.mileage,

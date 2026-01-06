@@ -190,12 +190,13 @@ async function handleGetModels(searchId: string, env: Env): Promise<Response> {
                     COALESCE(model, 'Desconhecido') as model,
                     COUNT(*) as count,
                     MIN(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as min_price,
-                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price
+                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price,
+                    MAX(thumbnail_url) as thumbnail_url
                 FROM alerts 
                 GROUP BY model 
                 ORDER BY count DESC
                 LIMIT 50
-            `).all<{ model: string; count: number; min_price: number; max_price: number }>();
+            `).all<{ model: string; count: number; min_price: number; max_price: number; thumbnail_url: string }>();
             modelStats = results;
         } else {
             // Get model counts from specific search
@@ -204,13 +205,14 @@ async function handleGetModels(searchId: string, env: Env): Promise<Response> {
                     COALESCE(model, 'Desconhecido') as model,
                     COUNT(*) as count,
                     MIN(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as min_price,
-                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price
+                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price,
+                    MAX(thumbnail_url) as thumbnail_url
                 FROM alerts 
                 WHERE search_id = ?
                 GROUP BY model 
                 ORDER BY count DESC
                 LIMIT 50
-            `).bind(searchId).all<{ model: string; count: number; min_price: number; max_price: number }>();
+            `).bind(searchId).all<{ model: string; count: number; min_price: number; max_price: number; thumbnail_url: string }>();
             modelStats = results;
         }
 
@@ -268,13 +270,18 @@ async function handleGetOpportunities(searchId: string, params: URLSearchParams,
         const model = params.get('model');
 
         // Get min_group_size
-        let minGroupSize = 3;
-        if (searchId !== 'all') {
-            const search = await env.DB.prepare('SELECT min_group_size FROM saved_searches WHERE id = ?')
-                .bind(searchId)
-                .first<{ min_group_size: number }>();
-            if (search?.min_group_size) {
-                minGroupSize = search.min_group_size;
+        let minGroupSize = parseInt(params.get('min_group_size') || '0', 10);
+
+        // If not provided in params (0), fallback to DB or default
+        if (minGroupSize === 0) {
+            minGroupSize = 3;
+            if (searchId !== 'all') {
+                const search = await env.DB.prepare('SELECT min_group_size FROM saved_searches WHERE id = ?')
+                    .bind(searchId)
+                    .first<{ min_group_size: number }>();
+                if (search?.min_group_size) {
+                    minGroupSize = search.min_group_size;
+                }
             }
         }
 
@@ -303,27 +310,38 @@ async function handleGetOpportunities(searchId: string, params: URLSearchParams,
             ? await stmt.bind(...bindings).all<Alert>()
             : await stmt.all<Alert>();
 
-        // Calculate median prices AND mileage per model
+        // Calculate median prices AND mileage per model AND brand
         const modelPrices = new Map<string, number[]>();
         const modelMileages = new Map<string, number[]>();
+        const brandPrices = new Map<string, number[]>();
+        const brandMileages = new Map<string, number[]>();
 
         for (const alert of alerts) {
             const mdl = alert.model || 'Desconhecido';
+            const brnd = (alert as any).brand || mdl.split(' ')[0] || 'Desconhecido';
             const price = parsePrice(alert.price);
 
             if (price > 0) {
                 if (!modelPrices.has(mdl)) modelPrices.set(mdl, []);
                 modelPrices.get(mdl)!.push(price);
+
+                if (!brandPrices.has(brnd)) brandPrices.set(brnd, []);
+                brandPrices.get(brnd)!.push(price);
             }
 
             if (alert.mileage && alert.mileage > 0) {
                 if (!modelMileages.has(mdl)) modelMileages.set(mdl, []);
                 modelMileages.get(mdl)!.push(alert.mileage);
+
+                if (!brandMileages.has(brnd)) brandMileages.set(brnd, []);
+                brandMileages.get(brnd)!.push(alert.mileage);
             }
         }
 
         const modelPriceMedians = new Map<string, number>();
         const modelKmMedians = new Map<string, number>();
+        const brandPriceMedians = new Map<string, number>();
+        const brandKmMedians = new Map<string, number>();
 
         // Helper for median
         const getMedian = (arr: number[]) => {
@@ -342,14 +360,28 @@ async function handleGetOpportunities(searchId: string, params: URLSearchParams,
                 modelKmMedians.set(mdl, getMedian(kms));
             }
         }
+        // Brand medians (use lower threshold for fallback)
+        for (const [brnd, prices] of brandPrices) {
+            if (prices.length >= minGroupSize) {
+                brandPriceMedians.set(brnd, getMedian(prices));
+            }
+        }
+        for (const [brnd, kms] of brandMileages) {
+            if (kms.length >= minGroupSize) {
+                brandKmMedians.set(brnd, getMedian(kms));
+            }
+        }
 
         // Score opportunities
         const opportunities = alerts
             .map(alert => {
                 const mdl = alert.model || 'Desconhecido';
+                const brnd = (alert as any).brand || mdl.split(' ')[0] || 'Desconhecido';
                 const price = parsePrice(alert.price);
-                const medianPrice = modelPriceMedians.get(mdl);
-                const medianKm = modelKmMedians.get(mdl);
+
+                // Use model median if available, otherwise fallback to brand median
+                const medianPrice = modelPriceMedians.get(mdl) || brandPriceMedians.get(brnd);
+                const medianKm = modelKmMedians.get(mdl) || brandKmMedians.get(brnd);
                 const km = alert.mileage || 0;
 
                 if (!medianPrice || price <= 0) return null;
@@ -400,7 +432,7 @@ async function handleGetOpportunities(searchId: string, params: URLSearchParams,
 
                 return {
                     ...alert,
-                    brand: extractBrand(alert.model),
+                    brand: brnd,
                     median: medianPrice,
                     pctBelowMedian: Math.round((1 - priceRatio) * 100),
                     score: score,
@@ -459,6 +491,7 @@ async function handleGetListings(searchId: string, params: URLSearchParams, env:
         const offset = parseInt(params.get('offset') || '0', 10);
         const brand = params.get('brand');
         const model = params.get('model');
+        const newOnly = params.get('newOnly') === 'true';
         const sortBy = params.get('sort') || 'created_at';
         const sortOrder = params.get('order') || 'desc';
 
@@ -475,6 +508,10 @@ async function handleGetListings(searchId: string, params: URLSearchParams, env:
         if (model) {
             query += ` AND model LIKE ?`;
             bindings.push(`%${model}%`);
+        }
+        if (newOnly) {
+            // Filter by last 24 hours
+            query += ` AND created_at >= datetime('now', '-24 hours')`;
         }
 
         // Validate sort column
@@ -501,6 +538,9 @@ async function handleGetListings(searchId: string, params: URLSearchParams, env:
         if (model) {
             countQuery += ` AND model LIKE ?`;
             countBindings.push(`%${model}%`);
+        }
+        if (newOnly) {
+            countQuery += ` AND created_at >= datetime('now', '-24 hours')`;
         }
 
         const countStmt = env.DB.prepare(countQuery);
@@ -636,7 +676,43 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return handleMigrateModels(env);
     }
 
+    // Debug: Get raw OLX ad properties
+    if (path === '/api/debug/olx-sample' && method === 'GET') {
+        return handleDebugOlxSample(env);
+    }
+
     return jsonResponse({ success: false, error: 'Not Found' }, 404);
+}
+
+async function handleDebugOlxSample(env: Env): Promise<Response> {
+    try {
+        const { fetchPage, getBuildId, buildDataUrl } = await import('./services/olx-fetcher');
+
+        // Get a saved search to use its URL
+        const { results } = await env.DB.prepare('SELECT human_url FROM saved_searches LIMIT 1').all<{ human_url: string }>();
+        if (results.length === 0) {
+            return jsonResponse({ success: false, error: 'No saved searches' }, 404);
+        }
+
+        const humanUrl = results[0].human_url;
+        const buildId = await getBuildId();
+        const dataUrl = buildDataUrl(humanUrl, buildId, 1);
+        const { ads } = await fetchPage(dataUrl);
+
+        // Return first 3 ads with all their properties
+        const sample = ads.slice(0, 3).map(ad => ({
+            listId: ad.listId,
+            subject: ad.subject,
+            price: ad.price,
+            properties: ad.properties,
+            // Include any other fields that might exist
+            raw: ad
+        }));
+
+        return jsonResponse({ success: true, data: { sample, total: ads.length } });
+    } catch (error) {
+        return jsonResponse({ success: false, error: String(error) }, 500);
+    }
 }
 
 async function handleMigrateModels(env: Env): Promise<Response> {

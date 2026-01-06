@@ -79,6 +79,7 @@ export interface Listing {
     municipality: string | null;
     neighbourhood: string | null;
     ad_url: string;
+    brand: string | null;
     model: string | null;
     date_ts: string | null;
     thumbnail_url: string | null;
@@ -88,8 +89,9 @@ export interface Listing {
 
 // OLX API response types
 export interface OlxAdProperty {
-    label: string;
-    value: string;
+    name?: string;   // e.g., 'vehicle_brand', 'vehicle_model', 'regdate', 'mileage'
+    label: string;   // Display label
+    value: string;   // The actual value
 }
 
 export interface OlxAd {
@@ -103,6 +105,11 @@ export interface OlxAd {
     };
     properties?: OlxAdProperty[];
     thumbnail?: string;
+    images?: Array<{
+        original: string;
+        originalWebp: string;
+        thumbnail?: string;
+    }>;
     date?: string;
 }
 

@@ -12,7 +12,8 @@ let currentFilters = {
     model: '',
     price: null,
     year: null,
-    trusted: true
+    trusted: true,
+    newOnly: false
 };
 let currentSort = 'created_at';
 let currentSortOrder = 'desc';
@@ -60,6 +61,7 @@ const filterModel = document.getElementById('filter-model');
 const filterPrice = document.getElementById('filter-price');
 const filterYear = document.getElementById('filter-year');
 const filterTrusted = document.getElementById('filter-trusted');
+const filterNewOnly = document.getElementById('filter-new-only');
 const clearFiltersBtn = document.getElementById('clear-filters');
 
 // Content elements
@@ -160,13 +162,19 @@ function setupEventListeners() {
         await loadOpportunities();
     });
 
+    filterNewOnly.addEventListener('change', async () => {
+        currentFilters.newOnly = filterNewOnly.checked;
+        await loadListings(true);
+    });
+
     clearFiltersBtn.addEventListener('click', async () => {
         filterBrand.value = '';
         filterModel.value = '';
         filterPrice.value = '';
         filterYear.value = '';
         filterTrusted.checked = true;
-        currentFilters = { brand: '', model: '', price: null, year: null, trusted: true };
+        filterNewOnly.checked = false;
+        currentFilters = { brand: '', model: '', price: null, year: null, trusted: true, newOnly: false };
         await loadOpportunities();
         await loadListings(true);
     });
@@ -296,6 +304,11 @@ async function loadOpportunities() {
         const params = new URLSearchParams();
         if (currentFilters.brand) params.set('brand', currentFilters.brand);
         if (currentFilters.model) params.set('model', currentFilters.model);
+
+        // Trusted filter
+        const minGroupSize = filterTrusted.checked ? '5' : '2';
+        params.set('min_group_size', minGroupSize);
+
         params.set('limit', '10');
 
         const headers = await getAuthHeaders();
@@ -392,21 +405,58 @@ async function loadModels() {
             filterModel.innerHTML = '<option value="">Todos</option>' +
                 models.map(m => `<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)}</option>`).join('');
 
-            // Populate table
-            modelsTableFull.innerHTML = models.map(m => `
-                <tr>
-                    <td>
-                        <a href="#" data-action="filter-model" data-value="${escapeHtml(m.model)}">${escapeHtml(m.model)}</a>
-                    </td>
-                    <td data-count="${m.count}">${m.count}</td>
-                    <td>${m.min_price ? formatPrice(m.min_price) + ' - ' + formatPrice(m.max_price) : '-'}</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm" data-action="ignore-model" data-value="${escapeHtml(m.model)}">
-                            Ignorar
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            // Populate custom card list
+            const container = document.getElementById('models-tab');
+            if (models.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhum modelo encontrado</div>';
+                return;
+            }
+
+            const cardListHTML = `
+                <div class="model-card-list">
+                    ${models.map(m => {
+                const priceRange = m.min_price
+                    ? `${formatPrice(m.min_price)} - ${formatPrice(m.max_price)}`
+                    : 'Sem preço';
+                const thumbHTML = m.thumbnail_url
+                    ? `<img src="${m.thumbnail_url}" class="model-thumb" alt="${escapeHtml(m.model)}" loading="lazy">`
+                    : `<div class="model-thumb-placeholder">🚗</div>`;
+
+                return `
+                        <div class="model-card-item">
+                            <div class="model-thumb-container">
+                                ${thumbHTML}
+                            </div>
+                            <div class="model-info-content">
+                                <div class="model-card-title" title="${escapeHtml(m.model)}">
+                                    <a href="#" data-action="filter-model" data-value="${escapeHtml(m.model)}" style="color:inherit;text-decoration:none;">
+                                        ${escapeHtml(m.model)}
+                                    </a>
+                                </div>
+                                <div class="model-card-stats">
+                                    <span class="model-stat-pill" title="Quantidade">
+                                        📄 ${m.count}
+                                    </span>
+                                    <span class="model-stat-pill" title="Faixa de Preço">
+                                        💰 ${priceRange}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="model-card-actions">
+                                <button class="btn btn-sm btn-secondary" data-action="filter-model" data-value="${escapeHtml(m.model)}" title="Ver anúncios">
+                                    Ver Lista
+                                </button>
+                                <button class="btn btn-icon btn-sm text-danger" data-action="ignore-model" data-value="${escapeHtml(m.model)}" title="Ignorar modelo">
+                                    🚫
+                                </button>
+                            </div>
+                        </div>
+                        `;
+            }).join('')}
+                </div>
+            `;
+
+            container.innerHTML = cardListHTML;
         }
     } catch (e) {
         console.error('Failed to load models:', e);
@@ -424,6 +474,7 @@ async function loadListings(reset = false) {
         const params = new URLSearchParams();
         if (currentFilters.brand) params.set('brand', currentFilters.brand);
         if (currentFilters.model) params.set('model', currentFilters.model);
+        if (currentFilters.newOnly) params.set('newOnly', 'true');
         params.set('sort', currentSort);
         params.set('order', currentSortOrder);
         params.set('limit', LISTINGS_LIMIT);
@@ -438,8 +489,16 @@ async function loadListings(reset = false) {
 
             listingsCount.textContent = `Mostrando ${Math.min(listingsOffset + listings.length, total)} de ${total}`;
 
-            const html = listings.map(l => `
+            const html = listings.map(l => {
+                const thumbHTML = l.thumbnail_url
+                    ? `<img src="${l.thumbnail_url}" class="listing-thumb" alt="${escapeHtml(l.model)}" loading="lazy">`
+                    : `<div class="listing-thumb-placeholder">🚗</div>`;
+
+                return `
                 <div class="listing-card">
+                    <div class="listing-thumb-container">
+                        ${thumbHTML}
+                    </div>
                     <div class="listing-info">
                         <div class="listing-title">${escapeHtml(l.subject || l.model || 'Sem título')}</div>
                         <div class="listing-meta">
@@ -450,12 +509,12 @@ async function loadListings(reset = false) {
                     </div>
                     <div class="listing-actions">
                         <button class="btn btn-primary btn-sm" data-action="open" data-url="${l.ad_url}">Abrir</button>
-                         <button class="btn btn-icon btn-sm ${l.status === 'favorite' ? 'active' : ''}" data-action="toggle-favorite" data-id="${l.id}" data-status="${l.status}" title="Favoritar">
+                        <button class="btn btn-icon btn-sm ${l.status === 'favorite' ? 'active' : ''}" data-action="toggle-favorite" data-id="${l.id}" data-status="${l.status}" title="Favoritar">
                             ${l.status === 'favorite' ? '⭐' : '☆'}
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
             if (reset) {
                 listingsGrid.innerHTML = html || '<div class="empty-state">Nenhum anúncio encontrado</div>';
