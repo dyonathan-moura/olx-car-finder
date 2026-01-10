@@ -179,42 +179,54 @@ async function handleGetAlerts(searchId: string, env: Env): Promise<Response> {
 }
 
 // Get model statistics for a search (or all searches if searchId is 'all')
-async function handleGetModels(searchId: string, env: Env): Promise<Response> {
+async function handleGetModels(searchId: string, params: URLSearchParams, env: Env): Promise<Response> {
     try {
+        const priceMax = params.get('price') ? parseInt(params.get('price')!) : null;
+        const yearMin = params.get('year') ? parseInt(params.get('year')!) : null;
+        const newOnly = params.get('newOnly') === 'true';
+
         let modelStats;
 
-        if (searchId === 'all') {
-            // Get model counts from ALL alerts
-            const { results } = await env.DB.prepare(`
-                SELECT 
-                    COALESCE(model, 'Desconhecido') as model,
-                    COUNT(*) as count,
-                    MIN(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as min_price,
-                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price,
-                    MAX(thumbnail_url) as thumbnail_url
-                FROM alerts 
-                GROUP BY model 
-                ORDER BY count DESC
-                LIMIT 50
-            `).all<{ model: string; count: number; min_price: number; max_price: number; thumbnail_url: string }>();
-            modelStats = results;
-        } else {
-            // Get model counts from specific search
-            const { results } = await env.DB.prepare(`
-                SELECT 
-                    COALESCE(model, 'Desconhecido') as model,
-                    COUNT(*) as count,
-                    MIN(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as min_price,
-                    MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price,
-                    MAX(thumbnail_url) as thumbnail_url
-                FROM alerts 
-                WHERE search_id = ?
-                GROUP BY model 
-                ORDER BY count DESC
-                LIMIT 50
-            `).bind(searchId).all<{ model: string; count: number; min_price: number; max_price: number; thumbnail_url: string }>();
-            modelStats = results;
+        let query = `
+            SELECT 
+                COALESCE(model, 'Desconhecido') as model,
+                COUNT(*) as count,
+                MIN(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as min_price,
+                MAX(CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER)) as max_price,
+                MAX(thumbnail_url) as thumbnail_url
+            FROM alerts 
+            WHERE 1=1
+        `;
+
+        const bindings: (string | number)[] = [];
+
+        if (searchId !== 'all') {
+            query += ` AND search_id = ?`;
+            bindings.push(searchId);
         }
+
+        if (priceMax) {
+            query += ` AND CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER) <= ?`;
+            bindings.push(priceMax);
+        }
+
+        if (yearMin) {
+            query += ` AND year >= ?`;
+            bindings.push(yearMin);
+        }
+
+        if (newOnly) {
+            query += ` AND created_at >= datetime('now', '-24 hours')`;
+        }
+
+        query += `
+            GROUP BY model 
+            ORDER BY count DESC
+            LIMIT 50
+        `;
+
+        const { results } = await env.DB.prepare(query).bind(...bindings).all<{ model: string; count: number; min_price: number; max_price: number; thumbnail_url: string }>();
+        modelStats = results;
 
         // Get whitelist/blacklist (only for specific search)
         let whitelist: string[] = [];
@@ -451,16 +463,36 @@ async function handleGetOpportunities(searchId: string, params: URLSearchParams,
 }
 
 // Get brand distribution
-async function handleGetBrands(searchId: string, env: Env): Promise<Response> {
+async function handleGetBrands(searchId: string, params: URLSearchParams, env: Env): Promise<Response> {
     try {
-        const query = searchId === 'all'
-            ? `SELECT model FROM alerts`
-            : `SELECT model FROM alerts WHERE search_id = ?`;
+        const priceMax = params.get('price') ? parseInt(params.get('price')!) : null;
+        const yearMin = params.get('year') ? parseInt(params.get('year')!) : null;
+        const newOnly = params.get('newOnly') === 'true';
+
+        let query = `SELECT model FROM alerts WHERE 1=1`;
+        const bindings: (string | number)[] = [];
+
+        if (searchId !== 'all') {
+            query += ` AND search_id = ?`;
+            bindings.push(searchId);
+        }
+
+        if (priceMax) {
+            query += ` AND CAST(REPLACE(REPLACE(REPLACE(price, 'R$ ', ''), '.', ''), ',', '') AS INTEGER) <= ?`;
+            bindings.push(priceMax);
+        }
+
+        if (yearMin) {
+            query += ` AND year >= ?`;
+            bindings.push(yearMin);
+        }
+
+        if (newOnly) {
+            query += ` AND created_at >= datetime('now', '-24 hours')`;
+        }
 
         const stmt = env.DB.prepare(query);
-        const { results } = searchId === 'all'
-            ? await stmt.all<{ model: string }>()
-            : await stmt.bind(searchId).all<{ model: string }>();
+        const { results } = await stmt.bind(...bindings).all<{ model: string }>();
 
         // Aggregate by brand (first word of model)
         const brandCounts = new Map<string, number>();
@@ -622,7 +654,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const modelsMatch = path.match(/^\/api\/searches\/([^/]+)\/models$/);
     if (modelsMatch) {
         const id = modelsMatch[1];
-        if (method === 'GET') return handleGetModels(id, env);
+        if (method === 'GET') return handleGetModels(id, url.searchParams, env);
     }
 
     // Match /api/searches/:id/opportunities (get top opportunities)
@@ -636,7 +668,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const brandsMatch = path.match(/^\/api\/searches\/([^/]+)\/brands$/);
     if (brandsMatch) {
         const id = brandsMatch[1];
-        if (method === 'GET') return handleGetBrands(id, env);
+        if (method === 'GET') return handleGetBrands(id, url.searchParams, env);
     }
 
     // Match /api/searches/:id/listings (get filtered listings)
@@ -695,7 +727,10 @@ async function handleDebugOlxSample(env: Env): Promise<Response> {
         }
 
         const humanUrl = results[0].human_url;
-        const buildId = await getBuildId();
+        const buildId = await getBuildId(humanUrl);
+        if (!buildId) {
+            return jsonResponse({ success: false, error: 'Could not resolve buildId' }, 500);
+        }
         const dataUrl = buildDataUrl(humanUrl, buildId, 1);
         const { ads } = await fetchPage(dataUrl);
 
