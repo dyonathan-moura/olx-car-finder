@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLX Car Finder</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🚗 OLX Car Finder</h1>
+        </header>
+
+        <!-- Save Search Form -->
+        <section id="save-section" class="section">
+            <h2>Salvar Busca Atual</h2>
+            <div id="current-url-info" class="url-info hidden">
+                <span class="url-label">URL detectada:</span>
+                <span id="current-url" class="url-text"></span>
+            </div>
+            <div id="not-olx-warning" class="warning hidden">
+                ⚠️ Navegue para uma busca na OLX para salvar
+            </div>
+            <form id="save-form" class="form">
+                <div class="form-group">
+                    <label for="search-name">Nome da busca</label>
+                    <input type="text" id="search-name" placeholder="Ex: RS 20-35k, 2014+" required>
+                </div>
+                <div class="form-group">
+                    <label for="check-period">Frequência de verificação</label>
+                    <select id="check-period">
+                        <option value="30">A cada 30 minutos</option>
+                        <option value="60" selected>A cada 1 hora</option>
+                        <option value="180">A cada 3 horas</option>
+                    </select>
+                </div>
+                <button type="submit" id="save-btn" class="btn btn-primary" disabled>
+                    💾 Salvar Busca
+                </button>
+            </form>
+        </section>
+
+        <!-- Saved Searches List -->
+        <section id="searches-section" class="section">
+            <h2>Minhas Buscas</h2>
+            <div id="searches-list" class="searches-list">
+                <div class="loading">Carregando...</div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <button id="scan-all-btn" class="btn btn-secondary btn-sm">🔍 Escanear Todas</button>
+            <a href="#" id="open-dashboard" class="link">📊 Dashboard</a>
+            <span id="status" class="status">✓</span>
+        </footer>
+    </div>
+
+    <script src="popup.js" type="module"></script>
+</body>
+
+</html>

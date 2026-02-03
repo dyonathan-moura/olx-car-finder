@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLX Car Finder - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app">
+        <!-- Top Header Bar -->
+        <header class="top-header">
+            <div class="header-left">
+                <span class="logo-icon">🚗</span>
+                <span class="logo-text">OLX Car Finder</span>
+            </div>
+            <div class="header-center">
+                <select id="search-select" class="search-select">
+                    <option value="all">📊 Todas as buscas</option>
+                </select>
+                <span class="last-check" id="last-check">Última: --:--</span>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary" id="open-olx-btn" title="Abrir na OLX">
+                    🔗 OLX
+                </button>
+                <button class="btn btn-primary" id="scan-btn" title="Rechecar agora">
+                    🔍 Rechecar
+                </button>
+                <button class="btn btn-icon" id="settings-btn" title="Configurações">
+                    ⚙️
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Section A: Quick Filters -->
+            <section class="filters-bar">
+                <div class="filter-group">
+                    <label>Marca</label>
+                    <select id="filter-brand" class="filter-select">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Modelo</label>
+                    <select id="filter-model" class="filter-select">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Preço ≤</label>
+                    <input type="number" id="filter-price" class="filter-input" placeholder="Max">
+                </div>
+                <div class="filter-group">
+                    <label>Ano ≥</label>
+                    <input type="number" id="filter-year" class="filter-input" placeholder="Min">
+                </div>
+                <div class="filter-toggle">
+                    <input type="checkbox" id="filter-trusted" checked>
+                    <label for="filter-trusted">Grupos confiáveis (≥5)</label>
+                </div>
+                <div class="filter-toggle highlight">
+                    <input type="checkbox" id="filter-new-only">
+                    <label for="filter-new-only">🆕 Apenas novos (24h)</label>
+                </div>
+                <button class="btn btn-text" id="clear-filters">Limpar filtros</button>
+            </section>
+
+            <!-- Section B: Ranking Panels -->
+            <section class="ranking-panels">
+                <!-- Left: Top Opportunities -->
+                <div class="panel opportunities-panel">
+                    <div class="panel-header">
+                        <h2>🏆 Top Oportunidades</h2>
+                        <span class="panel-subtitle">Comparado com a mediana do modelo</span>
+                    </div>
+                    <div class="panel-content" id="opportunities-list">
+                        <div class="loading">Carregando...</div>
+                    </div>
+                </div>
+
+                <!-- Right: Inventory -->
+                <div class="panel inventory-panel">
+                    <div class="panel-header">
+                        <div class="panel-tabs">
+                            <button class="tab-btn active" data-tab="brands">Marcas</button>
+                            <button class="tab-btn" data-tab="models">Modelos</button>
+                        </div>
+                    </div>
+                    <div class="panel-content">
+                        <!-- Brands Tab -->
+                        <div class="tab-content active" id="brands-tab">
+                            <table class="ranking-table" id="brands-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="brand">Marca</th>
+                                        <th data-sort="count" class="sortable sorted-desc">Anúncios ↓</th>
+                                        <th data-sort="percentage">%</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <!-- Models Tab -->
+                        <div class="tab-content" id="models-tab">
+                            <table class="ranking-table" id="models-table-full">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="model">Modelo</th>
+                                        <th data-sort="count" class="sortable sorted-desc">Qtd ↓</th>
+                                        <th data-sort="median_price">Mediana</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section C: Listings Feed -->
+            <section class="listings-section">
+                <div class="section-header">
+                    <h2>📋 Anúncios</h2>
+                    <span class="listings-count" id="listings-count">Mostrando 0 de 0</span>
+                    <div class="sort-controls">
+                        <select id="sort-by" class="sort-select">
+                            <option value="created_at">Mais recentes</option>
+                            <option value="price">Menor preço</option>
+                            <option value="model">Modelo A-Z</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="listings-grid" id="listings-grid">
+                    <div class="loading">Carregando anúncios...</div>
+                </div>
+                <div class="load-more-container">
+                    <button class="btn btn-secondary" id="load-more-btn" style="display:none;">
+                        Carregar mais
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal" id="settings-modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>⚙️ Configurações</h2>
+                    <button class="modal-close" id="settings-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>Busca a Configurar</h3>
+                        <div class="setting-row">
+                            <select id="settings-search-select" class="search-select">
+                                <option value="">Selecione uma busca</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Monitoramento</h3>
+                        <div class="setting-row">
+                            <label>Frequência de verificação</label>
+                            <select id="setting-frequency">
+                                <option value="30">A cada 30 minutos</option>
+                                <option value="60" selected>A cada 1 hora</option>
+                                <option value="180">A cada 3 horas</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Marcas Ignoradas</h3>
+                        <div class="chips-container" id="ignored-brands"></div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Modelos Ignorados</h3>
+                        <div class="chips-container" id="ignored-models"></div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>Critérios de Oportunidade</h3>
+                        <div class="setting-row">
+                            <label>Mín. anúncios por grupo (baseline)</label>
+                            <input type="number" id="setting-min-group" value="5" min="1" max="20">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn btn-primary" id="settings-save">💾 Salvar Configurações</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

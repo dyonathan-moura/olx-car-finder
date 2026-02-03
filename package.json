@@ -1,0 +1,20 @@
+{
+  "name": "olx-car-finder",
+  "version": "1.0.0",
+  "description": "Monitor OLX searches and get alerts for new car listings",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute olx-car-finder-db --local --file=./src/db/schema.sql",
+    "db:migrate:prod": "wrangler d1 execute olx-car-finder-db --file=./src/db/schema.sql"
+  },
+  "keywords": ["olx", "car", "finder", "cloudflare", "workers"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.99.0"
+  }
+}
